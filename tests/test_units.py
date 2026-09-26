@@ -1,7 +1,9 @@
+import os
+import tempfile
+import tomllib
 import unittest
 
-from tg_dev_digest import select, telegram
-from tg_dev_digest.config import Config
+from tg_dev_digest import config, select, sources, telegram
 from tg_dev_digest.item import Item, normalize_url
 from tg_dev_digest.sources import feed
 
@@ -55,17 +57,55 @@ class TelegramTest(unittest.TestCase):
 
 
 class ConfigTest(unittest.TestCase):
-    def test_empty_actions_vars_fall_back_to_defaults(self):
-        cfg = Config.from_env({"DIGEST_SOURCES": "", "DIGEST_SEEN_TTL_DAYS": " "})
-        self.assertEqual(cfg.sources, ["hatena", "zenn", "trending"])
-        self.assertEqual(cfg.ttl_days, 30)
+    def write(self, text):
+        d = tempfile.mkdtemp()
+        path = os.path.join(d, "digest.toml")
+        with open(path, "w") as f:
+            f.write(text)
+        return path
 
-    def test_feeds_and_limits(self):
-        cfg = Config.from_env(
-            {"DIGEST_FEEDS": "pk=https://e.com/feed?a=1", "DIGEST_LIMITS": "zenn=5, pk=3"}
-        )
-        self.assertEqual(cfg.feeds, {"pk": "https://e.com/feed?a=1"})
-        self.assertEqual((cfg.limit("zenn", 20), cfg.limit("pk", 10), cfg.limit("hatena", 20)), (5, 3, 20))
+    def test_repo_config_loads(self):
+        cfg = config.load({"DIGEST_CONFIG": "digest.toml"})
+        self.assertEqual([s.name for s in cfg.sources], ["hatena", "zenn", "trending"])
+        self.assertEqual(cfg.seen_max, 200)
+        self.assertEqual([s.name for s in cfg.sources if s.filter], ["hatena", "zenn"])
+
+    def test_env_selects_sources_and_empty_vars_are_ignored(self):
+        path = self.write(TOML)
+        cfg = config.load({"DIGEST_CONFIG": path, "DIGEST_SOURCES": "trending", "ANTHROPIC_API_KEY": ""})
+        self.assertEqual([s.name for s in cfg.sources], ["trending"])
+        cfg = config.load({"DIGEST_CONFIG": path, "DIGEST_SOURCES": " "})
+        self.assertEqual([s.name for s in cfg.sources], ["zenn", "trending"])
+
+    def test_disabled_and_unknown_sources(self):
+        path = self.write(TOML)
+        with self.assertRaises(ValueError):
+            config.load({"DIGEST_CONFIG": path, "DIGEST_SOURCES": "qiita"})
+
+    def test_extra_keys_become_options(self):
+        cfg = config.parse(tomllib.loads(TOML))
+        trending = cfg.sources[1]
+        self.assertEqual(trending.options, {"language": "python"})
+        self.assertEqual(sources.build(trending).url, "https://github.com/trending/python")
+
+
+TOML = """
+[[source]]
+name = "zenn"
+type = "zenn"
+limit = 5
+filter = true
+
+[[source]]
+name = "trending"
+type = "trending"
+language = "python"
+
+[[source]]
+name = "qiita"
+url = "https://qiita.com/popular-items/feed"
+enabled = false
+"""
 
 
 if __name__ == "__main__":

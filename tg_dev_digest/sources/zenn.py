@@ -2,7 +2,7 @@ import json
 
 from ..item import Item
 
-URL = "https://zenn.dev/api/articles?order=daily&count=50"
+URL = "https://zenn.dev/api/articles?order=daily&count=30"
 
 
 def parse(body: bytes, source: str = "zenn", label: str = "Zenn") -> list[Item]:

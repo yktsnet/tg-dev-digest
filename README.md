@@ -24,13 +24,13 @@ https://zenn.dev/yktsnet/articles/202608-hatena-github-digest
 
 ```mermaid
 flowchart LR
-  S[配信元ごとに取得] --> D{seen.json に<br>ある?}
-  D -- ある --> T[日付だけ更新]
+  S[配信元ごとに取得] --> D{seen.txt に<br>ある?}
+  D -- ある --> T[新しい側へ移す]
   D -- ない --> F{選別する<br>配信元?}
   F -- する --> H[Haiku が番号を選ぶ]
   F -- しない --> M
   H --> M[Telegram へ送信]
-  M --> W[送れた分を seen.json へ]
+  M --> W[送れた分を seen.txt へ]
 ```
 
 - **選別は配信元ごとに決める。** はてブと Zenn は関心外の記事が混ざるので Haiku に選ばせ、GitHub Trending は分野を絞らずに眺めたいのでそのまま送る。
@@ -39,13 +39,13 @@ flowchart LR
 
 ## 重複を消す仕組み
 
-送った URL は、リポジトリの `state` ブランチに置いた `seen.json` に記録する。中身は `{正規化した URL: 最後にフィードで見かけた日}` で、実行のたびに1コミットへ作り直して force-push する。main の履歴は汚れない。
+送った URL は、リポジトリの `state` ブランチに置いた `seen.txt` に直近200件だけ覚えておく。実行のたびに1コミットへ作り直して force-push するので、main の履歴は汚れない。
 
-記録するのは「最後に見かけた日」なので、ランキングに何週間居座る記事も二度と届かない。どのフィードからも消えて `DIGEST_SEEN_TTL_DAYS`（既定30日）が過ぎたら忘れる。
+フィードにまだ載っている記事は、見かけるたびに一覧の新しい側へ移す。ランキングに何週間居座る記事でも押し出されず、二度と届かない。外れていくのは、どのフィードからも消えた記事だけになる。各フィードに同時に載るのは既定の構成で合わせて85件ほど（はてブ 30・Zenn 30・Trending 25）なので、200件あれば足りる。
 
-- 選別で落ちた記事も記録するので、翌日また Haiku に判定させることはない
-- 件数の上限を超えて今回見送った記事は記録しないので、翌日以降の候補に残る
-- 送信に失敗した分は記録しないので、次の実行で送り直す
+- 選別で落ちた記事も覚えるので、翌日また Haiku に判定させることはない
+- 件数の上限を超えて今回見送った記事は覚えないので、翌日以降の候補に残る
+- 送信に失敗した分は覚えないので、次の実行で送り直す
 - URL は `utm_*`・末尾の `/`・`#` 以降・http と https の違いを揃えてから比べる。はてブに上がった Zenn 記事が Zenn 側にも出ても、1回しか届かない
 
 ## 使い方
@@ -60,7 +60,7 @@ GitHub で fork するか clone して自分のリポジトリに置き、Action
 
 これで毎日 JST 22:27 に `.github/workflows/digest.yml` が動く。schedule は混雑すると数時間遅れる。Actions のタブから手で起動するときは、`dry_run` を選ぶと送らずにログへ出す。
 
-手元では環境変数を渡して動かす。依存は Python 3.10 以上の標準ライブラリだけ。
+手元では環境変数を渡して動かす。依存は Python 3.11 以上の標準ライブラリだけ。
 
 ```bash
 python -m tg_dev_digest --dry-run                    # 送らずに標準出力へ。seen も書かない
@@ -71,37 +71,46 @@ python -m unittest discover -s tests
 
 ## 設定
 
-どれも環境変数で渡す。Actions では Settings → Secrets and variables → Actions の **Variables** に登録すれば、コードを変えずに切り替えられる。空のままなら既定値になる。
+配信元・件数・選別の基準は `digest.toml` に書く。コメントに各項目の意味がある。
 
-| 変数 | 既定 | 中身 |
+```toml
+[filter]
+model = "claude-haiku-4-5"
+topic = "AIやソフトウェア開発"   # プロンプトの「〜に関係する記事」に入る
+
+[[source]]
+name = "zenn"
+type = "zenn"
+limit = 20        # その回に新しく扱う件数
+filter = true     # Haiku に選ばせて「📰 開発 digest」にまとめる
+```
+
+`filter = true` の配信元は1通にまとめて届き、それ以外は配信元ごとに別のメッセージで届く。`enabled = false` を書けばその配信元は止まる。
+
+`type` は3つ。
+
+| type | 読むもの | 向いている配信元 |
 |---|---|---|
-| `DIGEST_SOURCES` | `hatena,zenn,trending` | 使う配信元と並び順。`trending` を外せば Trending の配信は止まる |
-| `DIGEST_FILTER_SOURCES` | `hatena,zenn` | Haiku に選ばせる配信元。ここに無い配信元は全件そのまま送る |
-| `DIGEST_TOPIC` | `AIやソフトウェア開発` | 選別の基準。プロンプトの「〜に関係する記事」に入る |
-| `DIGEST_LIMITS` | `hatena=20,zenn=20,trending=3`（独自フィードは10） | 配信元ごとの1回あたりの新着件数。`zenn=10,trending=5` のように一部だけ書ける |
-| `DIGEST_FEEDS` | なし | 独自の RSS / Atom を `名前=URL` のカンマ区切りで足す。名前を `DIGEST_SOURCES` にも書く |
-| `DIGEST_SEEN_TTL_DAYS` | `30` | フィードから消えた記事を忘れるまでの日数 |
-| `HATENA_CATEGORY` | `it` | はてブのホットエントリのカテゴリ（`it` / `general` / `entertainment` など） |
-| `TRENDING_LANGUAGE` | なし | `python` などを入れると言語別の Trending になる |
-| `TRENDING_SINCE` | なし（daily） | `weekly` / `monthly` |
-| `ANTHROPIC_MODEL` | `claude-haiku-4-5` | 選別に使うモデル |
+| `feed` | RSS 1.0 / 2.0 / Atom | はてブ、Qiita 人気記事、Publickey、dev.to、Hacker News（hnrss）など、フィードがあるもの全般 |
+| `zenn` | Zenn API のデイリーランキング | Zenn（フィードは新着順しか無いため） |
+| `trending` | GitHub Trending の HTML | GitHub Trending（フィードも API も無いため）。`language` / `since` を足せる |
 
-配信元を足す例:
+フィードがある配信元は `type = "feed"` と URL を書けば足りる。専用の読み方が要るのは、フィードが無いか、欲しいランキングがフィードに出ていない配信元だけ。
 
-```
-DIGEST_FEEDS=publickey=https://www.publickey1.jp/atom.xml
-DIGEST_SOURCES=hatena,zenn,publickey,trending
-DIGEST_FILTER_SOURCES=hatena,zenn,publickey
-```
+環境変数で渡すのは、秘密情報と次の2つだけ。
 
-`DIGEST_FILTER_SOURCES` に入れた配信元は「📰 開発 digest」に混ぜて届く。入れなければ、配信元ごとに別のメッセージで届く。
+| 変数 | 中身 |
+|---|---|
+| `DIGEST_SOURCES` | `zenn,trending` のように書くと、その回は `digest.toml` からこれだけを送る。Actions の Variables に置けば常時の絞り込みになる |
+| `DIGEST_CONFIG` | 設定ファイルの場所（既定 `digest.toml`） |
 
 ## 構成
 
 | ファイル | 役割 |
 |---|---|
 | `tg_dev_digest/sources/` | 配信元ごとの取得と解析。`feed.py` が RSS 1.0 / 2.0 / Atom を読み、はてブと独自フィードはこれを使う |
-| `tg_dev_digest/seen.py` | `seen.json` の読み書きと期限切れの掃除 |
+| `tg_dev_digest/config.py` | `digest.toml` と環境変数の読み込み |
+| `tg_dev_digest/seen.py` | `seen.txt` の読み書き。直近200件を残す |
 | `tg_dev_digest/select.py` | Haiku へのプロンプトと、返ってきた番号の解釈 |
 | `tg_dev_digest/telegram.py` | 4096 文字の上限に収まるよう分けてメッセージを組む |
 | `tg_dev_digest/digest.py` | 取得 → 重複除外 → 選別 → 送信 → 記録をつなぐ。HTTP・LLM・送信先は引数で受け取り、テストは偽物で回す |

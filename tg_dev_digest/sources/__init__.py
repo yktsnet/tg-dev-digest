@@ -1,48 +1,34 @@
 from dataclasses import dataclass
 from typing import Callable
 
+from ..config import SourceConfig
 from ..item import Item
 from . import feed, trending, zenn
 
 
 @dataclass
 class Source:
-    name: str
+    cfg: SourceConfig
     url: str
     parse: Callable[[bytes], list[Item]]
-    limit: int
+
+    @property
+    def name(self) -> str:
+        return self.cfg.name
+
+    @property
+    def limit(self) -> int:
+        return self.cfg.limit
 
 
-def build(cfg) -> list[Source]:
-    """Resolve DIGEST_SOURCES into fetchable sources, in the configured order."""
-    builtin = {
-        "hatena": lambda: Source(
-            "hatena",
-            f"https://b.hatena.ne.jp/hotentry/{cfg.hatena_category}.rss",
-            lambda b: feed.parse(b, "hatena", "はてブ"),
-            cfg.limit("hatena", 20),
-        ),
-        "zenn": lambda: Source("zenn", zenn.URL, zenn.parse, cfg.limit("zenn", 20)),
-        "trending": lambda: Source(
-            "trending",
-            trending.url(cfg.trending_language, cfg.trending_since),
-            trending.parse,
-            cfg.limit("trending", 3),
-        ),
-    }
-    out = []
-    for name in cfg.sources:
-        if name in builtin:
-            out.append(builtin[name]())
-        elif name in cfg.feeds:
-            out.append(
-                Source(
-                    name,
-                    cfg.feeds[name],
-                    lambda b, n=name: feed.parse(b, n, n),
-                    cfg.limit(name, 10),
-                )
-            )
-        else:
-            raise ValueError(f"unknown source: {name} (define it in DIGEST_FEEDS)")
-    return out
+def build(sc: SourceConfig) -> Source:
+    if sc.type == "feed":
+        if not sc.url:
+            raise ValueError(f"{sc.name}: type = \"feed\" needs url")
+        return Source(sc, sc.url, lambda b: feed.parse(b, sc.name, sc.label))
+    if sc.type == "zenn":
+        return Source(sc, sc.url or zenn.URL, lambda b: zenn.parse(b, sc.name, sc.label))
+    if sc.type == "trending":
+        url = sc.url or trending.url(sc.options.get("language", ""), sc.options.get("since", ""))
+        return Source(sc, url, lambda b: trending.parse(b, sc.name, sc.label))
+    raise ValueError(f"{sc.name}: unknown type {sc.type!r} (feed / zenn / trending)")

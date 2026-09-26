@@ -1,22 +1,18 @@
 import argparse
 import sys
-from datetime import datetime, timezone, timedelta
 
-from . import digest, http, select, telegram
-from .config import Config, _list
-
-JST = timezone(timedelta(hours=9))
+from . import config, digest, http, select, telegram
 
 
 def main(argv=None) -> int:
     ap = argparse.ArgumentParser(prog="tg-dev-digest")
     ap.add_argument("--dry-run", action="store_true", help="print messages instead of sending; do not save state")
-    ap.add_argument("--sources", help="override DIGEST_SOURCES (comma separated)")
+    ap.add_argument("--sources", help="send only these sources from the config file (comma separated)")
     args = ap.parse_args(argv)
 
-    cfg = Config.from_env()
+    cfg = config.load()
     if args.sources:
-        cfg.sources = _list(args.sources)
+        cfg.select_sources(config.split_names(args.sources))
 
     if args.dry_run:
         def send(text: str) -> None:
@@ -36,7 +32,6 @@ def main(argv=None) -> int:
         fetch=http.get,
         complete=complete,
         send=send,
-        today=datetime.now(JST).date(),
         save=not args.dry_run,
         log=log,
     )

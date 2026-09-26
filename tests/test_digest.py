@@ -2,10 +2,14 @@ import json
 import os
 import tempfile
 import unittest
-from datetime import date, timedelta
 
-from tg_dev_digest import digest
-from tg_dev_digest.config import Config
+from tg_dev_digest import config, digest
+
+SOURCES = {
+    "hatena": {"name": "hatena", "type": "feed", "label": "はてブ", "url": "https://b.hatena.ne.jp/x.rss", "limit": 20, "filter": True},
+    "zenn": {"name": "zenn", "type": "zenn", "label": "Zenn", "limit": 20, "filter": True},
+    "trending": {"name": "trending", "type": "trending", "label": "GitHub", "header": "🔥 GitHub Trending", "limit": 3},
+}
 
 
 def zenn_body(paths):
@@ -20,11 +24,14 @@ def trending_body(names):
 
 
 class Harness:
-    def __init__(self, **env):
-        self.dir = tempfile.mkdtemp()
-        base = {"DIGEST_STATE": os.path.join(self.dir, "seen.json"), "DIGEST_SOURCES": "zenn"}
-        base.update(env)
-        self.cfg = Config.from_env(base)
+    def __init__(self, sources=("zenn",), limits=None, seen_max=200):
+        limits = limits or {}
+        data = {
+            "seen": {"max": seen_max},
+            "source": [{**SOURCES[n], **({"limit": limits[n]} if n in limits else {})} for n in sources],
+        }
+        self.cfg = config.parse(data)
+        self.cfg.state_path = os.path.join(tempfile.mkdtemp(), "seen.txt")
         self.bodies = {}
         self.sent = []
 
@@ -36,14 +43,13 @@ class Harness:
                 return body
         raise AssertionError(url)
 
-    def run(self, day, complete=None, send=None):
+    def run(self, complete=None, send=None):
         self.sent = []
         return digest.run(
             self.cfg,
             fetch=self.fetch,
             complete=complete,
             send=send or self.sent.append,
-            today=day,
             log=lambda s: None,
         )
 
@@ -51,43 +57,50 @@ class Harness:
         return "\n".join(self.sent)
 
 
-D0 = date(2026, 9, 1)
-
-
 class SeenTest(unittest.TestCase):
-    def test_article_staying_on_ranking_is_not_resent_every_other_day(self):
+    def test_article_staying_on_ranking_is_not_resent(self):
+        h = Harness(seen_max=3)
+        h.bodies["https://zenn.dev"] = zenn_body(["a"])
+        h.run()
+        self.assertIn("title a", h.sent_text())
+        # 別の記事が何件流れてきても、載り続けている a は押し出されない
+        for i in range(10):
+            h.bodies["https://zenn.dev"] = zenn_body(["a", f"n{i}", f"m{i}"])
+            h.run()
+            self.assertNotIn("title a", h.sent_text(), f"resent on run {i}")
+
+    def test_article_returns_after_pushed_out(self):
+        h = Harness(seen_max=2)
+        h.bodies["https://zenn.dev"] = zenn_body(["a"])
+        h.run()
+        h.bodies["https://zenn.dev"] = zenn_body(["b", "c"])
+        h.run()
+        h.bodies["https://zenn.dev"] = zenn_body(["a"])
+        h.run()
+        self.assertIn("title a", h.sent_text())
+
+    def test_store_keeps_at_most_max(self):
+        h = Harness(seen_max=5)
+        h.bodies["https://zenn.dev"] = zenn_body([str(i) for i in range(12)])
+        h.run()
+        with open(h.cfg.state_path) as f:
+            self.assertEqual(len(f.read().split()), 5)
+
+    def test_title_with_spaces_is_remembered(self):
         h = Harness()
-        h.bodies["https://zenn.dev"] = zenn_body(["a"])
-        h.run(D0)
-        self.assertIn("title a", h.sent_text())
-        for i in range(1, 5):
-            h.run(D0 + timedelta(days=i))
-            self.assertEqual(h.sent, [], f"resent on day {i}")
-
-    def test_article_listed_longer_than_ttl_is_not_resent(self):
-        h = Harness(DIGEST_SEEN_TTL_DAYS="3")
-        h.bodies["https://zenn.dev"] = zenn_body(["a"])
-        h.run(D0)
-        for i in range(1, 10):
-            h.run(D0 + timedelta(days=i))
-            self.assertEqual(h.sent, [], f"resent on day {i}")
-
-    def test_article_returns_after_absent_for_ttl(self):
-        h = Harness(DIGEST_SEEN_TTL_DAYS="3")
-        h.bodies["https://zenn.dev"] = zenn_body(["a"])
-        h.run(D0)
-        h.bodies["https://zenn.dev"] = zenn_body([])
-        h.run(D0 + timedelta(days=4))
-        h.bodies["https://zenn.dev"] = zenn_body(["a"])
-        h.run(D0 + timedelta(days=5))
-        self.assertIn("title a", h.sent_text())
+        h.bodies["https://zenn.dev"] = json.dumps(
+            {"articles": [{"title": "Claude Opus 5.5 による検証", "path": "/u/articles/a", "topics": []}]}
+        ).encode()
+        h.run()
+        h.run()
+        self.assertEqual(h.sent, [])
 
     def test_items_past_limit_stay_candidates(self):
-        h = Harness(DIGEST_LIMITS="zenn=2")
+        h = Harness(limits={"zenn": 2})
         h.bodies["https://zenn.dev"] = zenn_body(["a", "b", "c"])
-        h.run(D0)
+        h.run()
         self.assertNotIn("title c", h.sent_text())
-        h.run(D0 + timedelta(days=1))
+        h.run()
         self.assertIn("title c", h.sent_text())
         self.assertNotIn("title a", h.sent_text())
 
@@ -100,9 +113,9 @@ class SeenTest(unittest.TestCase):
             prompts.append(prompt)
             return '{"ids":[1]}'
 
-        h.run(D0, complete)
+        h.run(complete)
         self.assertNotIn("title b", h.sent_text())
-        h.run(D0 + timedelta(days=1), complete)
+        h.run(complete)
         self.assertEqual(len(prompts), 1)
 
     def test_failed_send_is_retried_next_run(self):
@@ -112,29 +125,29 @@ class SeenTest(unittest.TestCase):
         def boom(_):
             raise OSError("telegram down")
 
-        self.assertEqual(h.run(D0, send=boom), 1)
-        h.run(D0 + timedelta(days=1))
+        self.assertEqual(h.run(send=boom), 1)
+        h.run()
         self.assertIn("title a", h.sent_text())
 
     def test_trending_sends_next_unseen_repos(self):
-        h = Harness(DIGEST_SOURCES="trending", DIGEST_LIMITS="trending=2")
+        h = Harness(sources=("trending",), limits={"trending": 2})
         h.bodies["https://github.com/trending"] = trending_body(["o/a", "o/b", "o/c"])
-        h.run(D0)
-        h.run(D0 + timedelta(days=1))
+        h.run()
+        h.run()
         self.assertIn("o/c", h.sent_text())
         self.assertNotIn("o/a", h.sent_text())
 
 
 class PipelineTest(unittest.TestCase):
     def test_same_url_from_two_sources_is_sent_once(self):
-        h = Harness(DIGEST_SOURCES="hatena,zenn")
+        h = Harness(sources=("hatena", "zenn"))
         h.bodies["https://b.hatena.ne.jp"] = (
             b'<rdf:RDF xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#" xmlns="http://purl.org/rss/1.0/">'
             b"<item><title>title a</title><link>https://zenn.dev/u/articles/a?utm_source=hb</link></item>"
             b"</rdf:RDF>"
         )
         h.bodies["https://zenn.dev"] = zenn_body(["a"])
-        h.run(D0)
+        h.run()
         self.assertEqual(h.sent_text().count("title a"), 1)
         self.assertIn("[はてブ]", h.sent_text())
 
@@ -144,30 +157,30 @@ class PipelineTest(unittest.TestCase):
         h.bodies["https://zenn.dev"] = json.dumps(
             {"articles": [{"title": long, "path": "/u/articles/a", "topics": []}]}
         ).encode()
-        h.run(D0, lambda p: '{"ids":[1]}')
+        h.run(lambda p: '{"ids":[1]}')
         self.assertIn(long, h.sent_text())
         self.assertIn("[Zenn]", h.sent_text())
 
     def test_broken_filter_falls_back_to_unfiltered(self):
         h = Harness()
         h.bodies["https://zenn.dev"] = zenn_body(["a"])
-        self.assertEqual(h.run(D0, lambda p: "sorry"), 1)
+        self.assertEqual(h.run(lambda p: "sorry"), 1)
         self.assertIn("未選別", h.sent_text())
         self.assertIn("title a", h.sent_text())
 
     def test_one_source_failing_does_not_block_others(self):
-        h = Harness(DIGEST_SOURCES="zenn,trending")
+        h = Harness(sources=("zenn", "trending"))
         h.bodies["https://zenn.dev"] = OSError("zenn down")
         h.bodies["https://github.com/trending"] = trending_body(["o/a"])
-        self.assertEqual(h.run(D0), 1)
+        self.assertEqual(h.run(), 1)
         self.assertIn("o/a", h.sent_text())
 
     def test_unfiltered_source_is_not_sent_to_model(self):
-        h = Harness(DIGEST_SOURCES="zenn,trending")
+        h = Harness(sources=("zenn", "trending"))
         h.bodies["https://zenn.dev"] = zenn_body(["a"])
         h.bodies["https://github.com/trending"] = trending_body(["o/a"])
         prompts = []
-        h.run(D0, lambda p: prompts.append(p) or '{"ids":[]}')
+        h.run(lambda p: prompts.append(p) or '{"ids":[]}')
         self.assertNotIn("o/a", prompts[0])
         self.assertIn("o/a", h.sent_text())
         self.assertNotIn("title a", h.sent_text())

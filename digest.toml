@@ -1,0 +1,49 @@
+# 配信元・件数・選別を決める。秘密情報はここに書かず、環境変数（Actions の secrets）で渡す。
+# DIGEST_SOURCES=zenn,trending のように環境変数を渡すと、その回だけここから選んで送る。
+
+[filter]
+# filter = true の配信元は、この基準で Haiku に選ばせてから1通にまとめて送る
+model = "claude-haiku-4-5"
+topic = "AIやソフトウェア開発"
+header = "📰 開発 digest"
+
+[seen]
+# 送信済みとして覚えておく URL の件数。フィードに載り続けている記事は毎回新しい側へ移るので、
+# 各フィードに同時に載る件数の合計（既定の構成で85件ほど）より大きければよい
+max = 200
+
+# type は feed（RSS 1.0 / 2.0 / Atom）・zenn（Zenn API）・trending（GitHub Trending の HTML）
+# limit はその回に新しく扱う件数。enabled = false で止められる
+
+[[source]]
+name = "hatena"
+type = "feed"
+label = "はてブ"
+url = "https://b.hatena.ne.jp/hotentry/it.rss"
+limit = 20
+filter = true
+
+[[source]]
+name = "zenn"
+type = "zenn"
+label = "Zenn"
+limit = 20
+filter = true
+
+[[source]]
+name = "trending"
+type = "trending"
+label = "GitHub"
+header = "🔥 GitHub Trending"
+limit = 3
+# language = "python"
+# since = "weekly"
+
+# 足すときの例（Qiita の人気記事）
+# [[source]]
+# name = "qiita"
+# type = "feed"
+# label = "Qiita"
+# url = "https://qiita.com/popular-items/feed"
+# limit = 10
+# filter = true

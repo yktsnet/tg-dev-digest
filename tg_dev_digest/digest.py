@@ -1,13 +1,10 @@
 from dataclasses import dataclass, field
-from datetime import date
 from typing import Callable
 
 from . import select, sources, telegram
 from .item import Item
 from .seen import SeenStore
 
-FILTERED_HEADER = "📰 開発 digest"
-HEADERS = {"trending": "🔥 GitHub Trending"}
 
 
 @dataclass
@@ -22,8 +19,8 @@ class Section:
 def collect(srcs, fetch, store: SeenStore, log) -> tuple[dict[str, list[Item]], list[str], int]:
     """Fetch every source and split each feed into new items and still-listed seen ones.
 
-    Seen items that are still on a feed are returned as `alive` so their date is
-    refreshed; that is what stops an article from coming back every other day.
+    Seen items that are still on a feed are returned as `alive` and moved to the
+    newest end of the store, so a long-listed article never ages out and returns.
     New items past the limit are left untouched so a later run can still pick them.
     """
     fresh: dict[str, list[Item]] = {}
@@ -58,25 +55,27 @@ def run(
     fetch: Callable[[str], bytes],
     complete: Callable[[str], str] | None,
     send: Callable[[str], None],
-    today: date,
     save: bool = True,
     log: Callable[[str], None] = print,
 ) -> int:
-    store = SeenStore.load(cfg.state_path, cfg.ttl_days)
-    fresh, alive, failures = collect(sources.build(cfg), fetch, store, log)
-    store.touch(alive, today)
+    store = SeenStore.load(cfg.state_path, cfg.seen_max)
+    srcs = [sources.build(sc) for sc in cfg.sources]
+    fresh, alive, failures = collect(srcs, fetch, store, log)
+    store.touch(alive)
 
     sections: list[Section] = []
-    pool = Section(FILTERED_HEADER, with_label=True)
-    for name, items in fresh.items():
-        if name in cfg.filter_sources:
+    pool = Section(cfg.filtered_header, with_label=True)
+    for src in srcs:
+        if src.name not in fresh:
+            continue
+        items = fresh[src.name]
+        if src.cfg.filter:
             if not any(sec is pool for sec in sections):
                 sections.append(pool)
             pool.items += items
         else:
-            sections.append(
-                Section(HEADERS.get(name, f"🗞 {name}"), items, [it.key for it in items])
-            )
+            header = src.cfg.header or f"🗞 {src.cfg.label}"
+            sections.append(Section(header, items, [it.key for it in items]))
 
     if pool.items:
         pool.evaluated = [it.key for it in pool.items]
@@ -102,9 +101,8 @@ def run(
             log(f"send failed ({sec.header}): {e}")
             failures += 1
             continue
-        store.touch(sec.evaluated, today)
+        store.touch(sec.evaluated)
 
-    store.prune(today)
     if save:
         store.save(cfg.state_path)
     return 1 if failures else 0

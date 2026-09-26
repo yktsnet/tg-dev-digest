@@ -1,41 +1,35 @@
-import json
 import os
-from datetime import date, timedelta
 
 
 class SeenStore:
-    """URL → the last date it was observed in any feed.
+    """The most recent `max_size` URLs, oldest first.
 
-    Keeping the *last* observation rather than the first means an article that
-    stays on a ranking for weeks is never re-sent; it only becomes new again
-    after it has been absent from every feed for `ttl_days`.
+    A URL that is still listed on a feed is moved to the end every run, so an
+    article that stays on a ranking never falls out and gets re-sent. Only URLs
+    that have dropped off every feed age out.
     """
 
-    def __init__(self, entries: dict[str, str], ttl_days: int):
-        self.entries = dict(entries)
-        self.ttl_days = ttl_days
+    def __init__(self, urls: list[str], max_size: int):
+        self.urls = list(dict.fromkeys(urls))
+        self.max_size = max_size
 
     @classmethod
-    def load(cls, path: str, ttl_days: int) -> "SeenStore":
+    def load(cls, path: str, max_size: int) -> "SeenStore":
         if not os.path.exists(path):
-            return cls({}, ttl_days)
+            return cls([], max_size)
         with open(path, encoding="utf-8") as f:
-            return cls(json.load(f), ttl_days)
+            return cls([line.strip() for line in f if line.strip()], max_size)
 
     def __contains__(self, key: str) -> bool:
-        return key in self.entries
+        return key in self.urls
 
-    def touch(self, keys, today: date) -> None:
-        stamp = today.isoformat()
-        for key in keys:
-            self.entries[key] = stamp
-
-    def prune(self, today: date) -> None:
-        cutoff = (today - timedelta(days=self.ttl_days)).isoformat()
-        self.entries = {k: v for k, v in self.entries.items() if v >= cutoff}
+    def touch(self, keys) -> None:
+        keys = list(dict.fromkeys(keys))
+        moved = set(keys)
+        self.urls = [u for u in self.urls if u not in moved] + keys
+        self.urls = self.urls[-self.max_size :]
 
     def save(self, path: str) -> None:
         os.makedirs(os.path.dirname(path) or ".", exist_ok=True)
         with open(path, "w", encoding="utf-8") as f:
-            json.dump(dict(sorted(self.entries.items())), f, ensure_ascii=False, indent=0)
-            f.write("\n")
+            f.writelines(u + "\n" for u in self.urls)
