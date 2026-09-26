@@ -1,6 +1,6 @@
 # tg-dev-digest
 
-はてなブックマーク・Zenn・GitHub Trending から開発まわりの記事を毎日集め、Claude Haiku に選ばせて Telegram へ流す。サーバーは持たず、GitHub Actions だけで回る。
+このリポは、はてなブックマーク・Zenn・GitHub Trending から開発まわりの記事を毎日 Telegram へ届けるバッチで、Claude Haiku には記事の番号だけを選ばせ、送信済みの URL は GitHub のブランチに持たせて、サーバーを置かずに GitHub Actions だけで回す。
 
 ```
 📰 開発 digest
