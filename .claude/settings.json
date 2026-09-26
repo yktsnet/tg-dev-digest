@@ -7,7 +7,11 @@
       "Bash(ssh *)",
       "Bash(rsync *)",
       "Bash(gh workflow run *)",
-      "Bash(gh secret *)"
+      "Bash(gh secret *)",
+      "Bash(wrangler *)",
+      "Bash(npx wrangler *)",
+      "Bash(nix run nixpkgs#wrangler -- deploy*)",
+      "Bash(nix run nixpkgs#wrangler -- secret*)"
     ],
     "allow": [
       "Bash(git *)",
@@ -16,5 +20,8 @@
       "Bash(python *)"
     ]
   },
-  "attribution": { "commit": "", "pr": "" }
+  "attribution": {
+    "commit": "",
+    "pr": ""
+  }
 }

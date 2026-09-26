@@ -38,7 +38,24 @@ In the Actions tab, choose `digest`, click Run workflow, check `dry_run`, and st
 
 If it looks right, run it again without `dry_run` and confirm the message arrives on Telegram. The first run creates the `state` branch and records the sent URLs in `seen.txt`.
 
-From then on it runs daily at UTC 13:27 (JST 22:27). Change the time with `cron` in `.github/workflows/digest.yml`. Schedules can be delayed by hours when GitHub is busy.
+From then on it runs daily at UTC 13:27 (JST 22:27). Change the time with `cron` in `.github/workflows/digest.yml`. GitHub schedules, however, can be delayed by hours when busy. If you want it on time, add step 5.
+
+## 5. Start on time (optional)
+
+`worker/` is a Worker that only calls `workflow_dispatch` from a Cloudflare Workers Cron Trigger. A dispatch starts within seconds. Keep the schedule as a fallback for days the Worker does not run. A delayed schedule run that arrives after the Worker sees that the `state` branch was updated within the last 20 hours and exits without doing anything.
+
+1. Create a fine-grained personal access token on GitHub. Limit repository access to this repository and permissions to Actions: Read and write
+2. Change `vars.REPO` in `worker/wrangler.jsonc` to your repository
+3. Deploy
+
+```bash
+cd worker
+npx wrangler login
+npx wrangler secret put GITHUB_TOKEN   # paste the token from step 1
+npx wrangler deploy
+```
+
+To change the time, set `triggers.crons` in `wrangler.jsonc` and `cron` in `digest.yml` to the same value.
 
 ## Narrowing sources temporarily
 

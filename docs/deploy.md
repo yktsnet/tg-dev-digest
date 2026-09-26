@@ -38,7 +38,24 @@ Actions タブで `digest` を選び、Run workflow から `dry_run` にチェ�
 
 問題が無ければ `dry_run` を外してもう一度起動し、Telegram に届くことを確かめる。初回の実行で `state` ブランチが作られ、送った URL が `seen.txt` に入る。
 
-以後は毎日 UTC 13:27（JST 22:27）に動く。時刻は `.github/workflows/digest.yml` の `cron` で変える。schedule は混雑すると数時間遅れることがある。
+以後は毎日 UTC 13:27（JST 22:27）に動く。時刻は `.github/workflows/digest.yml` の `cron` で変える。ただし GitHub の schedule は混雑すると数時間遅れる。定刻に届けたい場合は次の 5 を足す。
+
+## 5. 定刻に起動する（任意）
+
+`worker/` は、Cloudflare Workers の Cron Trigger から `workflow_dispatch` を叩いて定刻に起動するだけの Worker。dispatch は数秒で走り始める。schedule は残しておき、Worker が動かなかった日の保険にする。Worker の実行後に遅れて来た schedule は、`state` ブランチが20時間以内に更新されているのを見て何もせずに終わる。
+
+1. GitHub で fine-grained personal access token を作る。Repository access はこのリポジトリだけ、Permissions は Actions の Read and write だけにする
+2. `worker/wrangler.jsonc` の `vars.REPO` を自分のリポジトリに書き換える
+3. デプロイする
+
+```bash
+cd worker
+npx wrangler login
+npx wrangler secret put GITHUB_TOKEN   # 1 のトークンを貼る
+npx wrangler deploy
+```
+
+時刻を変えるときは、`wrangler.jsonc` の `triggers.crons` と `digest.yml` の `cron` を同じ値にそろえる。
 
 ## 配信元を一時的に絞る
 

@@ -1,0 +1,19 @@
+{
+  "name": "tg-dev-digest-trigger",
+  "main": "src/index.js",
+  "compatibility_date": "2026-09-20",
+  // HTTP では何も受けないので workers.dev の URL も作らない
+  "workers_dev": false,
+  "triggers": {
+    // UTC 13:27 = JST 22:27。digest.yml の schedule と同じ時刻にしておく
+    "crons": ["27 13 * * *"]
+  },
+  "vars": {
+    "REPO": "yktsnet/tg-dev-digest",
+    "WORKFLOW": "digest.yml",
+    "REF": "main"
+  },
+  "observability": {
+    "enabled": true
+  }
+}

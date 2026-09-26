@@ -117,6 +117,12 @@ Items that are not recorded become candidates again on the next run: those skipp
 
 URLs are compared after normalizing `utm_*`, trailing `/`, anything after `#`, and http vs https. A Zenn article that also trends on Hatena Bookmark arrives only once.
 
+### On-time start is left to Cloudflare Workers
+
+GitHub Actions schedules are delayed when busy. With the previous setup, the start was delayed by a median of 3.9 hours and up to 9.6 hours. A `workflow_dispatch`, by contrast, starts within seconds.
+
+So `worker/` holds a Worker that only calls `workflow_dispatch` from a Cloudflare Workers Cron Trigger. The schedule stays as a fallback for days the Worker does not run; if the `state` branch was updated within the last 20 hours it exits without doing anything, so nothing arrives twice. The Worker is optional, and the schedule alone still works.
+
 ### One failure does not stop the rest
 
 Failures in fetching, filtering, and sending are each contained. If one source fails the others are still sent, and on a day the filter fails, everything is sent with an "未選別" (unfiltered) header. A run with any failure exits with code 1, so it shows red in the Actions UI.
@@ -130,12 +136,13 @@ Failures in fetching, filtering, and sending are each contained. If one source f
 | Filter | Claude Haiku (`claude-haiku-4-5`) | It only picks matching numbers from a list, so the cheapest model that suffices is used. Swappable via `[filter].model` |
 | State | git branch (`state`) | Too small for a database, and `actions/cache` expires in seven days. Using the repository itself needs no extra service |
 | Delivery | Telegram Bot API | Up to 4096 characters per message, so even a long digest splits rarely |
+| Trigger | Cloudflare Workers (Cron Trigger) | A few lines that call `workflow_dispatch` on time, within the free tier, still without a server |
 
 ## Scope
 
 - **Does**: filters articles and delivers them without duplicates, daily, to one chat
 - **Does not**: summarize, fetch article bodies, track read state, route to multiple chats, or provide a web viewer
-- **May break**: GitHub Trending is scraped from HTML, so a DOM change on GitHub's side breaks it. Actions schedules can be delayed by hours when busy
+- **May break**: GitHub Trending is scraped from HTML, so a DOM change on GitHub's side breaks it. Without the Worker, Actions schedules can be delayed by hours when busy
 
 Behavior fixed by tests is listed in [docs/guarantees.en.md](docs/guarantees.en.md). Anything not listed there is not a promise.
 

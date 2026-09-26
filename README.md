@@ -117,6 +117,12 @@ flowchart TD
 
 URL は `utm_*`・末尾の `/`・`#` 以降・http と https の違いを揃えてから比べる。はてブに上がった Zenn の記事が Zenn 側にも出ても、1回しか届かない。
 
+### 定刻の起動は Cloudflare Workers に任せる
+
+GitHub Actions の schedule は混雑すると遅れる。以前の仕組みでは、開始の遅れが中央値で3.9時間、最大で9.6時間あった。一方、`workflow_dispatch` で起動すると数秒で走り始める。
+
+そこで `worker/` に、Cloudflare Workers の Cron Trigger から `workflow_dispatch` を叩くだけの Worker を置いた。schedule は Worker が動かなかった日の保険として残し、`state` ブランチが20時間以内に更新されていれば何もせずに終わらせて、二重に届かないようにしている。Worker は任意で、無くても schedule だけで動く。
+
 ### 1つが落ちても残りは届ける
 
 配信元の取得・選別・送信の失敗は、それぞれの単位で閉じる。1つの配信元が落ちても残りは送り、選別が失敗した日は見出しに「未選別」と付けて全件を送る。失敗があった実行は終了コード 1 で終わるので、Actions の画面で赤く見える。
@@ -130,12 +136,13 @@ URL は `utm_*`・末尾の `/`・`#` 以降・http と https の違いを揃え
 | 選別 | Claude Haiku（`claude-haiku-4-5`） | 記事一覧から条件に合う番号を拾うだけなので、足りる中で一番安いモデルを使う。`[filter].model` で差し替えられる |
 | 状態 | git ブランチ（`state`） | DB を立てるほどの量ではなく、`actions/cache` は7日で消える。リポジトリ自体を置き場にすれば追加のサービスが要らない |
 | 配信 | Telegram Bot API | 1通 4096 字まで送れて、長い digest でも分割が少ない |
+| 起動 | Cloudflare Workers（Cron Trigger） | 定刻に `workflow_dispatch` を叩くだけの数行で済み、無料枠に収まる。サーバーを持たない方針を崩さない |
 
 ## Scope
 
 - **やること**: 記事の選別と、重複なしの配信。1つのチャットへの日次配信
 - **やらないこと**: 要約・本文の取得・既読管理・複数チャットへの振り分け・Web の閲覧画面
-- **壊れうるところ**: GitHub Trending は HTML を読んでいるので、GitHub 側の DOM が変わると取れなくなる。Actions の schedule は混雑すると数時間遅れる
+- **壊れうるところ**: GitHub Trending は HTML を読んでいるので、GitHub 側の DOM が変わると取れなくなる。Worker を置かない場合、Actions の schedule は混雑すると数時間遅れる
 
 テストで固定している振る舞いは [docs/guarantees.md](docs/guarantees.md) にある。そこに無い振る舞いは約束ではない。
 
