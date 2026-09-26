@@ -4,7 +4,7 @@
 
 [![CI](https://github.com/yktsnet/tg-dev-digest/actions/workflows/ci.yml/badge.svg)](https://github.com/yktsnet/tg-dev-digest/actions/workflows/ci.yml)
 
-A daily batch job that delivers software-development articles from Hatena Bookmark, Zenn, and GitHub Trending to Telegram. Claude Haiku only picks article numbers, the list of already-sent URLs lives on a git branch, and the whole thing runs on GitHub Actions with no server.
+A daily batch job that delivers software-development articles to Telegram. Hatena Bookmark, Zenn, and GitHub Trending are built in, and any other site can be added by putting its RSS feed in the config. Claude Haiku only picks article numbers, the list of already-sent URLs lives on a git branch, and the whole thing runs on GitHub Actions with no server.
 
 ```
 📰 開発 digest

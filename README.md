@@ -4,7 +4,7 @@
 
 [![CI](https://github.com/yktsnet/tg-dev-digest/actions/workflows/ci.yml/badge.svg)](https://github.com/yktsnet/tg-dev-digest/actions/workflows/ci.yml)
 
-このリポは、はてなブックマーク・Zenn・GitHub Trending から開発まわりの記事を毎日 Telegram へ届けるバッチで、Claude Haiku には記事の番号だけを選ばせ、送信済みの URL は GitHub のブランチに持たせて、サーバーを置かずに GitHub Actions だけで回す。
+このリポは、開発まわりの記事を毎日 Telegram へ届けるバッチで、はてなブックマーク・Zenn・GitHub Trending を既定の配信元に持ち、ほかのサイトも RSS を設定に書くだけで足せる。Claude Haiku に記事の番号だけを選ばせ、送信済みの URL は GitHub のブランチに持たせて、サーバーを置かずに GitHub Actions だけで回す。
 
 ```
 📰 開発 digest
