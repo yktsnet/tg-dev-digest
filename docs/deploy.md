@@ -1,3 +1,5 @@
+[🇯🇵 日本語](deploy.md) | [🇬🇧 English](deploy.en.md)
+
 # Deploy
 
 fork したリポジトリの GitHub Actions で、毎日 Telegram に届くようにする手順。

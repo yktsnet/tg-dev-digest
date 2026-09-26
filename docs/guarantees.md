@@ -1,3 +1,5 @@
+[🇯🇵 日本語](guarantees.md) | [🇬🇧 English](guarantees.en.md)
+
 # Guarantee Ledger
 
 ## Guarantees
