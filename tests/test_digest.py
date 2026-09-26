@@ -43,13 +43,14 @@ class Harness:
                 return body
         raise AssertionError(url)
 
-    def run(self, complete=None, send=None):
+    def run(self, complete=None, send=None, save=True):
         self.sent = []
         return digest.run(
             self.cfg,
             fetch=self.fetch,
             complete=complete,
             send=send or self.sent.append,
+            save=save,
             log=lambda s: None,
         )
 
@@ -126,6 +127,14 @@ class SeenTest(unittest.TestCase):
             raise OSError("telegram down")
 
         self.assertEqual(h.run(send=boom), 1)
+        h.run()
+        self.assertIn("title a", h.sent_text())
+
+    def test_dry_run_does_not_write_seen(self):
+        h = Harness()
+        h.bodies["https://zenn.dev"] = zenn_body(["a"])
+        h.run(save=False)
+        self.assertFalse(os.path.exists(h.cfg.state_path))
         h.run()
         self.assertIn("title a", h.sent_text())
 
