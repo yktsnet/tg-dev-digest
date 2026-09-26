@@ -1,8 +1,9 @@
 name: digest
 
 on:
+  # 定刻の起動は worker/ の Cron Trigger が workflow_dispatch で行う。schedule は数時間遅れるので、
+  # Worker が動かなかった日の保険として残す（Worker の実行後なら Load state で止まる）
   schedule:
-    # 毎時0分は schedule のディスパッチが最も混むため非0分にし、遅延分を見越して前倒しする
     - cron: '27 13 * * *' # UTC 13:27 ＝ JST 22:27
   workflow_dispatch:
     inputs:
@@ -33,13 +34,21 @@ jobs:
 
       # 送信済み URL は state ブランチの seen.txt に置く。actions/cache は7日触らないと消えるため使わない
       - name: Load state
+        id: state
         run: |
           mkdir -p state
           if git fetch --depth=1 origin state 2>/dev/null; then
             git show FETCH_HEAD:seen.txt > state/seen.txt
+            age=$(( $(date +%s) - $(git log -1 --format=%ct FETCH_HEAD) ))
+            # 20時間以内に state が更新されていれば、その日の配信は済んでいる
+            if [ "$GITHUB_EVENT_NAME" = schedule ] && [ "$age" -lt 72000 ]; then
+              echo "state was updated $((age / 3600))h ago; skipping the delayed schedule run"
+              echo "skip=true" >> "$GITHUB_OUTPUT"
+            fi
           fi
 
       - name: Run digest
+        if: steps.state.outputs.skip != 'true'
         env:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
@@ -50,7 +59,7 @@ jobs:
 
       # 配信元の一部が落ちた日も、届いた分は seen に残す
       - name: Save state
-        if: ${{ !cancelled() && !inputs.dry_run && hashFiles('state/seen.txt') != '' }}
+        if: ${{ !cancelled() && steps.state.outputs.skip != 'true' && !inputs.dry_run && hashFiles('state/seen.txt') != '' }}
         run: |
           git config user.name  "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"

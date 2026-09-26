@@ -22,7 +22,14 @@ digest.toml          # 配信元・件数・選別の設定
 .github/workflows/
 ├── digest.yml       # 日次実行。state ブランチの読み書きもここ
 └── ci.yml           # テスト
+worker/
+├── wrangler.jsonc   # Cron Trigger と dispatch 先
+└── src/index.js     # scheduled で workflow_dispatch を POST するだけ
 ```
+
+## 起動の経路
+
+定刻の起動は `worker/` の Cron Trigger が `workflow_dispatch` で行う。`digest.yml` の schedule は保険で、`Load state` が `state` ブランチの最終コミットを見て、20時間以内なら後続の step を飛ばす。この判定は schedule のときだけで、手動や Worker からの dispatch には効かない。
 
 ## 1回の実行の流れ
 

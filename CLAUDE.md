@@ -17,6 +17,8 @@ python -m tg_dev_digest --dry-run --sources trending # digest.toml から一部�
 python -m unittest discover -s tests                 # テスト
 ```
 
+`worker/` は定刻に `workflow_dispatch` を叩くだけの Cloudflare Worker（JS、依存なし）。デプロイと `wrangler secret` は user が行う。
+
 依存は Python 3.11 以上の標準ライブラリだけ（`tomllib` を使う）。ビルドも pip install も無い。
 
 ## 検証手段

@@ -15,3 +15,7 @@ __pycache__/
 
 # 実行時の送信済み URL（Actions では state ブランチに置く）
 state/
+
+# Cloudflare Workers のローカル生成物
+.wrangler/
+node_modules/
