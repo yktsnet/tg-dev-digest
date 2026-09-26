@@ -1,0 +1,68 @@
+name: digest
+
+on:
+  schedule:
+    # 毎時0分は schedule のディスパッチが最も混むため非0分にし、遅延分を見越して前倒しする
+    - cron: '27 13 * * *' # UTC 13:27 ＝ JST 22:27
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: 'Print messages to the log instead of sending; do not save state'
+        type: boolean
+        default: false
+      sources:
+        description: 'Override DIGEST_SOURCES for this run (comma separated)'
+        required: false
+
+permissions:
+  contents: write
+
+concurrency:
+  group: digest
+  cancel-in-progress: false
+
+jobs:
+  digest:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-python@v7
+        with:
+          python-version: '3.12'
+
+      # 送信済み URL は state ブランチの seen.json に置く。actions/cache は7日触らないと消えるため使わない
+      - name: Load state
+        run: |
+          mkdir -p state
+          if git fetch --depth=1 origin state 2>/dev/null; then
+            git show FETCH_HEAD:seen.json > state/seen.json
+          fi
+
+      - name: Run digest
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+          DIGEST_SOURCES: ${{ inputs.sources || vars.DIGEST_SOURCES }}
+          DIGEST_FILTER_SOURCES: ${{ vars.DIGEST_FILTER_SOURCES }}
+          DIGEST_TOPIC: ${{ vars.DIGEST_TOPIC }}
+          DIGEST_FEEDS: ${{ vars.DIGEST_FEEDS }}
+          DIGEST_LIMITS: ${{ vars.DIGEST_LIMITS }}
+          DIGEST_SEEN_TTL_DAYS: ${{ vars.DIGEST_SEEN_TTL_DAYS }}
+          HATENA_CATEGORY: ${{ vars.HATENA_CATEGORY }}
+          TRENDING_LANGUAGE: ${{ vars.TRENDING_LANGUAGE }}
+          TRENDING_SINCE: ${{ vars.TRENDING_SINCE }}
+          ANTHROPIC_MODEL: ${{ vars.ANTHROPIC_MODEL }}
+        run: python -m tg_dev_digest ${{ inputs.dry_run && '--dry-run' || '' }}
+
+      # 配信元の一部が落ちた日も、届いた分は seen に残す
+      - name: Save state
+        if: ${{ !cancelled() && !inputs.dry_run && hashFiles('state/seen.json') != '' }}
+        run: |
+          git config user.name  "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          blob=$(git hash-object -w state/seen.json)
+          tree=$(printf '100644 blob %s\tseen.json\n' "$blob" | git mktree)
+          commit=$(git commit-tree "$tree" -m "state: $(date -u +%F)")
+          git push --force origin "${commit}:refs/heads/state"
