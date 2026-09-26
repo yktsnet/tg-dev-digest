@@ -20,10 +20,6 @@ Official, Anthropic-managed directory of high quality Claude Code Plugins.
 https://github.com/anthropics/claude-plugins-official
 ```
 
-The motivation and the monthly API cost ($0.28) are written up on Zenn (Japanese).
-
-https://zenn.dev/yktsnet/articles/202608-hatena-github-digest
-
 ## Quick Start
 
 With Python 3.11+, you can preview today's digest locally without any API key or bot.
