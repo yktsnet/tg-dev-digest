@@ -1,3 +1,17 @@
-__pycache__/
-state/
+# OS
+.DS_Store
+Thumbs.db
+
+# env
 .env
+.env.local
+.env.*.local
+
+# Claude Code
+.claude/settings.local.json
+
+# Python
+__pycache__/
+
+# 実行時の送信済み URL（Actions では state ブランチに置く）
+state/
