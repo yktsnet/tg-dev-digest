@@ -2,8 +2,8 @@
 # DIGEST_SOURCES=zenn,trending のように環境変数を渡すと、その回だけここから選んで送る。
 
 [filter]
-# filter = true の配信元は、この基準で Haiku に選ばせてから1通にまとめて送る
-model = "claude-haiku-4-5"
+# filter = true の配信元は、この基準で Gemini に選ばせてから1通にまとめて送る
+model = "gemini-3.5-flash-lite"
 topic = "AIやソフトウェア開発"
 header = "📰 開発 digest"
 

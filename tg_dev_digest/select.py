@@ -45,13 +45,16 @@ def select(items: list[Item], topic: str, complete: Callable[[str], str]) -> lis
     return [items[i] for i in ids]
 
 
-def anthropic_complete(api_key: str, model: str, post_json) -> Callable[[str], str]:
+def gemini_complete(api_key: str, model: str, post_json) -> Callable[[str], str]:
     def complete(prompt: str) -> str:
         result = post_json(
-            "https://api.anthropic.com/v1/messages",
-            {"model": model, "max_tokens": 512, "messages": [{"role": "user", "content": prompt}]},
-            {"x-api-key": api_key, "anthropic-version": "2023-06-01"},
+            f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent",
+            {
+                "contents": [{"parts": [{"text": prompt}]}],
+                "generationConfig": {"responseMimeType": "application/json"},
+            },
+            {"x-goog-api-key": api_key},
         )
-        return result["content"][0]["text"]
+        return result["candidates"][0]["content"]["parts"][0]["text"]
 
     return complete

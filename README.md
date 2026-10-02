@@ -4,7 +4,7 @@
 
 [![CI](https://github.com/yktsnet/tg-dev-digest/actions/workflows/ci.yml/badge.svg)](https://github.com/yktsnet/tg-dev-digest/actions/workflows/ci.yml)
 
-このリポは、開発まわりの記事を毎日 Telegram へ届けるバッチで、はてなブックマーク・Zenn・GitHub Trending を既定の配信元に持ち、ほかのサイトも RSS を設定に書くだけで足せる。Claude Haiku に記事の番号だけを選ばせ、送信済みの URL は GitHub のブランチに持たせて、サーバーを置かずに GitHub Actions だけで回す。
+このリポは、開発まわりの記事を毎日 Telegram へ届けるバッチで、はてなブックマーク・Zenn・GitHub Trending を既定の配信元に持ち、ほかのサイトも RSS を設定に書くだけで足せる。Gemini に記事の番号だけを選ばせ、送信済みの URL は GitHub のブランチに持たせて、サーバーを置かずに GitHub Actions だけで回す。
 
 ```
 📰 開発 digest
@@ -30,7 +30,7 @@ cd tg-dev-digest
 python -m tg_dev_digest --dry-run
 ```
 
-実データを取って、送る予定のメッセージを標準出力に出す。`ANTHROPIC_API_KEY` が無いので選別は飛ばされ、見出しに「未選別」と付く。送信済みの記録（`seen.txt`）も書かない。
+実データを取って、送る予定のメッセージを標準出力に出す。`GEMINI_API_KEY` が無いので選別は飛ばされ、見出しに「未選別」と付く。送信済みの記録（`seen.txt`）も書かない。
 
 毎日 Telegram に届くようにするには、fork して Actions に secrets を登録する。手順は [docs/deploy.md](docs/deploy.md)。
 
@@ -48,7 +48,7 @@ python -m tg_dev_digest                               # 送信する（Telegram 
 
 ```toml
 [filter]
-model = "claude-haiku-4-5"
+model = "gemini-3.5-flash-lite"
 topic = "AIやソフトウェア開発"   # プロンプトの「〜に関係する記事」に入る
 
 [seen]
@@ -59,7 +59,7 @@ name = "zenn"
 type = "zenn"
 label = "Zenn"
 limit = 20                       # その回に新しく扱う件数
-filter = true                    # Haiku に選ばせて「📰 開発 digest」にまとめる
+filter = true                    # Gemini に選ばせて「📰 開発 digest」にまとめる
 ```
 
 `filter = true` の配信元は1通にまとめて届き、それ以外は配信元ごとに別の1通で届く。`enabled = false` を書けばその配信元は止まる。
@@ -78,7 +78,7 @@ filter = true                    # Haiku に選ばせて「📰 開発 digest」
 
 ## Design Decisions
 
-### Haiku には番号だけを返させる
+### モデルには番号だけを返させる
 
 選別の入力は1行1件の記事一覧で、出力は `{"ids":[3,7,12]}` だけにしている。タイトルと URL と配信元の名前は、手元の記事データから出す。
 
@@ -88,7 +88,7 @@ filter = true                    # Haiku に選ばせて「📰 開発 digest」
 
 ### 選別するかを配信元ごとに決める
 
-はてブと Zenn は関心外の記事が混ざるので Haiku を通す。GitHub Trending は、分野を絞らずに英語圏で何が伸びているかを眺めること自体に価値があるので、通さずに上位をそのまま送る。選別を実行全体に一律でかけず、`[[source]]` ごとの `filter` で決める。
+はてブと Zenn は関心外の記事が混ざるので Gemini を通す。GitHub Trending は、分野を絞らずに英語圏で何が伸びているかを眺めること自体に価値があるので、通さずに上位をそのまま送る。選別を実行全体に一律でかけず、`[[source]]` ごとの `filter` で決める。
 
 ### 送信済みの URL を state ブランチに持つ
 
@@ -109,7 +109,7 @@ flowchart TD
 
 フィードに載っている記事は、見かけるたびに一覧の新しい側へ移す。ランキングに何週間居座る記事でも200件の外へ押し出されず、再送されない。外れていくのは、どのフィードからも消えた記事だけになる。各フィードに同時に載るのは既定の構成で85件ほど（はてブ 30・Zenn 30・Trending 25）なので、200件で足りる。
 
-覚えない記事は、次の実行で改めて候補になる。上限を超えて今回見送った記事は翌日以降に届き、送信に失敗した記事は送り直される。選別で落ちた記事は送信の成功と同時に覚えるので、翌日また Haiku に判定させることはない。
+覚えない記事は、次の実行で改めて候補になる。上限を超えて今回見送った記事は翌日以降に届き、送信に失敗した記事は送り直される。選別で落ちた記事は送信の成功と同時に覚えるので、翌日また Gemini に判定させることはない。
 
 URL は `utm_*`・末尾の `/`・`#` 以降・http と https の違いを揃えてから比べる。はてブに上がった Zenn の記事が Zenn 側にも出ても、1回しか届かない。
 
@@ -129,7 +129,7 @@ GitHub Actions の schedule は混雑すると遅れる。以前の仕組みで�
 |---|---|---|
 | 実行 | GitHub Actions（schedule） | 1日1回・数十秒で終わる処理にサーバーを置く理由が無い。無料枠に収まる |
 | 言語 | Python 3.11+（標準ライブラリのみ） | `urllib`・`html.parser`・`xml.etree`・`tomllib` で足りる。pip install が要らないので、Actions でも手元でも同じコマンドで動く |
-| 選別 | Claude Haiku（`claude-haiku-4-5`） | 記事一覧から条件に合う番号を拾うだけなので、足りる中で一番安いモデルを使う。`[filter].model` で差し替えられる |
+| 選別 | Gemini Flash-Lite（`gemini-3.5-flash-lite`） | 記事一覧から条件に合う番号を拾うだけなので、足りる中で一番安いモデルを使う。1日1回なら無料枠に収まる。`[filter].model` で差し替えられる |
 | 状態 | git ブランチ（`state`） | DB を立てるほどの量ではなく、`actions/cache` は7日で消える。リポジトリ自体を置き場にすれば追加のサービスが要らない |
 | 配信 | Telegram Bot API | 1通 4096 字まで送れて、長い digest でも分割が少ない |
 | 起動 | Cloudflare Workers（Cron Trigger） | 定刻に `workflow_dispatch` を叩くだけの数行で済み、無料枠に収まる。サーバーを持たない方針を崩さない |

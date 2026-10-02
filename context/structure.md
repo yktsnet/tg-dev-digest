@@ -2,12 +2,12 @@
 
 ```
 tg_dev_digest/
-├── __main__.py      # CLI。config を読み、本物の http / Anthropic / Telegram を組み立てて digest.run に渡す
+├── __main__.py      # CLI。config を読み、本物の http / Gemini / Telegram を組み立てて digest.run に渡す
 ├── config.py        # digest.toml と環境変数の読み込み
 ├── digest.py        # 取得 → 重複除外 → 選別 → 送信 → seen 更新
 ├── item.py          # Item と URL の正規化
 ├── seen.py          # seen.txt（直近 N 件の URL）
-├── select.py        # Haiku へのプロンプトと番号の解釈
+├── select.py        # 選別モデルへのプロンプトと番号の解釈
 ├── telegram.py      # メッセージの組み立てと分割、sendMessage
 ├── http.py          # urllib の GET / POST JSON
 └── sources/
@@ -38,7 +38,7 @@ worker/
    - seen にある URL → `alive`（新しい側へ移すだけ）
    - seen に無く、上限以内 → その回の新着
    - seen に無く、上限を超えた → 触らない（翌日以降の候補に残る）
-3. `filter = true` の配信元の新着を1つの `Section` に集め、`select.select` で Haiku に番号を選ばせる。それ以外の配信元は配信元ごとの `Section` になる
+3. `filter = true` の配信元の新着を1つの `Section` に集め、`select.select` で Gemini に番号を選ばせる。それ以外の配信元は配信元ごとの `Section` になる
 4. `Section` ごとに `telegram.render` で 4000 字以下に分けて送る。送れた `Section` の `evaluated`（選別で落ちた分を含む）を seen に入れる
 5. `seen.txt` を直近 `[seen].max` 件に切り詰めて保存する
 
