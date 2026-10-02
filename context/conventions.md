@@ -8,7 +8,7 @@
 
 ## 外部とのやり取りは引数で受け取る
 
-`digest.run` は `fetch` / `complete` / `send` を関数として受け取る。`select.anthropic_complete` と `telegram.sender` は、`http.post_json` を受け取って関数を返す工場にしてある。本物を組み立てるのは `__main__.py` だけ。
+`digest.run` は `fetch` / `complete` / `send` を関数として受け取る。`select.gemini_complete` と `telegram.sender` は、`http.post_json` を受け取って関数を返す工場にしてある。本物を組み立てるのは `__main__.py` だけ。
 
 テストは偽物の関数を渡すだけで回る。モックライブラリは使わない。
 

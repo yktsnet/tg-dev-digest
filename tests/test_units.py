@@ -72,7 +72,7 @@ class ConfigTest(unittest.TestCase):
 
     def test_env_selects_sources_and_empty_vars_are_ignored(self):
         path = self.write(TOML)
-        cfg = config.load({"DIGEST_CONFIG": path, "DIGEST_SOURCES": "trending", "ANTHROPIC_API_KEY": ""})
+        cfg = config.load({"DIGEST_CONFIG": path, "DIGEST_SOURCES": "trending", "GEMINI_API_KEY": ""})
         self.assertEqual([s.name for s in cfg.sources], ["trending"])
         cfg = config.load({"DIGEST_CONFIG": path, "DIGEST_SOURCES": " "})
         self.assertEqual([s.name for s in cfg.sources], ["zenn", "trending"])

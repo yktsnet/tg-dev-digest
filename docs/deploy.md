@@ -10,9 +10,9 @@ fork したリポジトリの GitHub Actions で、毎日 Telegram に届くよ�
 2. 作った Bot に何か1通送る
 3. ブラウザで `https://api.telegram.org/bot<トークン>/getUpdates` を開き、`chat.id` の値を控える
 
-## 2. Anthropic の API キーを用意する
+## 2. Gemini の API キーを用意する
 
-[Anthropic Console](https://console.anthropic.com/) でキーを発行する。キーを用意しない場合は選別が飛ばされ、はてブと Zenn の新着が全件「未選別」で届く。
+[Google AI Studio](https://aistudio.google.com/apikey) でキーを発行する。1日1回の選別なら無料枠に収まる。キーを用意しない場合は選別が飛ばされ、はてブと Zenn の新着が全件「未選別」で届く。
 
 ## 3. secrets を登録する
 
@@ -20,14 +20,14 @@ fork したリポジトリの Settings → Secrets and variables → Actions →
 
 | 名前 | 値 |
 |---|---|
-| `ANTHROPIC_API_KEY` | 2 のキー |
+| `GEMINI_API_KEY` | 2 のキー |
 | `TELEGRAM_BOT_TOKEN` | 1 のトークン |
 | `TELEGRAM_CHAT_ID` | 1 の `chat.id` |
 
 `gh` を使うならこう打つ（値は標準入力から渡る）。
 
 ```bash
-gh secret set ANTHROPIC_API_KEY
+gh secret set GEMINI_API_KEY
 gh secret set TELEGRAM_BOT_TOKEN
 gh secret set TELEGRAM_CHAT_ID
 ```

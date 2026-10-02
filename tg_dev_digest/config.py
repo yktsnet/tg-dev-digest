@@ -23,7 +23,7 @@ class Config:
     filtered_header: str
     seen_max: int
     state_path: str
-    anthropic_key: str = ""
+    gemini_key: str = ""
     telegram_token: str = ""
     telegram_chat_id: str = ""
 
@@ -61,7 +61,7 @@ def parse(data: dict) -> Config:
         )
     return Config(
         sources=sources,
-        model=filt.get("model", "claude-haiku-4-5"),
+        model=filt.get("model", "gemini-3.5-flash-lite"),
         topic=filt.get("topic", "AIやソフトウェア開発"),
         filtered_header=filt.get("header", "📰 開発 digest"),
         seen_max=int(data.get("seen", {}).get("max", 200)),
@@ -81,7 +81,7 @@ def load(env=os.environ) -> Config:
     if get("DIGEST_SOURCES"):
         cfg.select_sources(split_names(get("DIGEST_SOURCES")))
     cfg.state_path = get("DIGEST_STATE") or cfg.state_path
-    cfg.anthropic_key = get("ANTHROPIC_API_KEY")
+    cfg.gemini_key = get("GEMINI_API_KEY")
     cfg.telegram_token = get("TELEGRAM_BOT_TOKEN")
     cfg.telegram_chat_id = get("TELEGRAM_CHAT_ID")
     return cfg

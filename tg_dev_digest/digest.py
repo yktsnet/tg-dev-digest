@@ -81,7 +81,7 @@ def run(
         pool.evaluated = [it.key for it in pool.items]
         if complete is None:
             pool.header += "（未選別）"
-            log("filter: ANTHROPIC_API_KEY not set, sending unfiltered")
+            log("filter: GEMINI_API_KEY not set, sending unfiltered")
         else:
             try:
                 pool.items = select.select(pool.items, cfg.topic, complete)

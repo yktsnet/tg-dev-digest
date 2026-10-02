@@ -24,7 +24,7 @@ def main(argv=None) -> int:
         return 2
 
     complete = (
-        select.anthropic_complete(cfg.anthropic_key, cfg.model, http.post_json) if cfg.anthropic_key else None
+        select.gemini_complete(cfg.gemini_key, cfg.model, http.post_json) if cfg.gemini_key else None
     )
     log = lambda s: print(s, file=sys.stderr)
     return digest.run(
