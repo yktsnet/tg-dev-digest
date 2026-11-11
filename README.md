@@ -140,7 +140,7 @@ GitHub Actions の schedule は混雑すると遅れる。以前の仕組みで�
 - **やらないこと**: 要約・本文の取得・既読管理・複数チャットへの振り分け・Web の閲覧画面
 - **壊れうるところ**: GitHub Trending は HTML を読んでいるので、GitHub 側の DOM が変わると取れなくなる。Worker を置かない場合、Actions の schedule は混雑すると数時間遅れる
 
-テストで固定している振る舞いは [docs/guarantees.md](docs/guarantees.md) にある。そこに無い振る舞いは約束ではない。
+テストで固定している振る舞いは [docs/guarantees/](docs/guarantees/README.md) にある。そこに無い振る舞いは約束ではない。
 
 ## License
 

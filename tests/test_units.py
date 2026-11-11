@@ -1,9 +1,11 @@
+import contextlib
+import io
 import os
 import tempfile
 import tomllib
 import unittest
 
-from tg_dev_digest import config, select, sources, telegram
+from tg_dev_digest import __main__, config, select, sources, telegram
 from tg_dev_digest.item import Item, normalize_url
 from tg_dev_digest.sources import feed
 
@@ -36,6 +38,15 @@ class FeedTest(unittest.TestCase):
         )
         [it] = feed.parse(xml, "s", "S")
         self.assertEqual((it.title, it.url, it.tags), ("T", "https://e.com/1", ["c"]))
+
+
+    def test_rss1(self):
+        xml = (
+            b'<rdf:RDF xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#" xmlns="http://purl.org/rss/1.0/">'
+            b"<item><title>T</title><link>https://e.com/1</link></item></rdf:RDF>"
+        )
+        [it] = feed.parse(xml, "s", "S")
+        self.assertEqual((it.title, it.url), ("T", "https://e.com/1"))
 
 
 class SelectTest(unittest.TestCase):
@@ -82,11 +93,51 @@ class ConfigTest(unittest.TestCase):
         with self.assertRaises(ValueError):
             config.load({"DIGEST_CONFIG": path, "DIGEST_SOURCES": "qiita"})
 
+    def test_disabled_source_is_not_loaded(self):
+        cfg = config.load({"DIGEST_CONFIG": self.write(TOML)})
+        self.assertNotIn("qiita", [s.name for s in cfg.sources])
+
     def test_extra_keys_become_options(self):
         cfg = config.parse(tomllib.loads(TOML))
         trending = cfg.sources[1]
         self.assertEqual(trending.options, {"language": "python"})
         self.assertEqual(sources.build(trending).url, "https://github.com/trending/python")
+
+
+class CliTest(unittest.TestCase):
+    def setUp(self):
+        d = tempfile.mkdtemp()
+        self.path = os.path.join(d, "digest.toml")
+        with open(self.path, "w") as f:
+            f.write(TOML)
+        self.env = {"DIGEST_CONFIG": self.path, "DIGEST_STATE": os.path.join(d, "seen.txt")}
+
+    def main(self, argv, env):
+        calls = {}
+
+        def fake_run(cfg, **kw):
+            calls["cfg"] = cfg
+            return 0
+
+        orig_load, orig_run = __main__.config.load, __main__.digest.run
+        __main__.config.load = lambda: orig_load(env)
+        __main__.digest.run = fake_run
+        try:
+            with contextlib.redirect_stderr(io.StringIO()):
+                code = __main__.main(argv)
+        finally:
+            __main__.config.load, __main__.digest.run = orig_load, orig_run
+        return code, calls
+
+    def test_sources_flag_selects_sources(self):
+        code, calls = self.main(["--dry-run", "--sources", "trending"], self.env)
+        self.assertEqual(code, 0)
+        self.assertEqual([s.name for s in calls["cfg"].sources], ["trending"])
+
+    def test_missing_telegram_credentials_exit_2_without_running(self):
+        code, calls = self.main([], self.env)
+        self.assertEqual(code, 2)
+        self.assertNotIn("cfg", calls)
 
 
 TOML = """

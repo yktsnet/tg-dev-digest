@@ -140,7 +140,7 @@ Failures in fetching, filtering, and sending are each contained. If one source f
 - **Does not**: summarize, fetch article bodies, track read state, route to multiple chats, or provide a web viewer
 - **May break**: GitHub Trending is scraped from HTML, so a DOM change on GitHub's side breaks it. Without the Worker, Actions schedules can be delayed by hours when busy
 
-Behavior fixed by tests is listed in [docs/guarantees.en.md](docs/guarantees.en.md). Anything not listed there is not a promise.
+Behavior fixed by tests is listed in [docs/guarantees/](docs/guarantees/README.md) (Japanese). Anything not listed there is not a promise.
 
 ## License
 
