@@ -7,7 +7,7 @@
 
 はてブ・Zenn・GitHub Trending から開発まわりの記事を集め、Gemini に選ばせて Telegram へ送る日次バッチ。GitHub Actions だけで動き、サーバーを持たない。
 
-フェーズは **MVP期**。相談者が開放チャットで直接実装してよい。保証台帳（`docs/guarantees.md`）が正式運用になった時点で Issueドリブン期へ上げる。
+フェーズは **MVP期**。相談者が開放チャットで直接実装してよい。保証台帳（`docs/guarantees/`）が正式運用になった時点で Issueドリブン期へ上げる。
 
 ## コマンド
 

@@ -177,6 +177,11 @@ class PipelineTest(unittest.TestCase):
         self.assertIn("未選別", h.sent_text())
         self.assertIn("title a", h.sent_text())
 
+    def test_clean_run_returns_zero(self):
+        h = Harness()
+        h.bodies["https://zenn.dev"] = zenn_body(["a"])
+        self.assertEqual(h.run(lambda p: '{"ids":[1]}'), 0)
+
     def test_one_source_failing_does_not_block_others(self):
         h = Harness(sources=("zenn", "trending"))
         h.bodies["https://zenn.dev"] = OSError("zenn down")
